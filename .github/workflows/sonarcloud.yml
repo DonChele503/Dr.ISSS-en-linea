@@ -17,7 +17,12 @@ jobs:
 
       - name: 📥 Descargar APK desde Google Drive
         run: |
-          wget --no-check-certificate "https://drive.google.com/uc?export=download&id=1-4rE6JDNl376ph-FX9umJygEBECaaB5y" -O app.apk
+          pip install gdown
+          gdown --id 1-4rE6JDNl376ph-FX9umJygEBECaaB5y -O app.apk
+
+      - name: ✅ Verificar APK descargado
+        run: |
+          if [ -f "app.apk" ]; then echo "APK descargado correctamente"; else echo "Error: APK no encontrado"; exit 1; fi
 
       - name: 🔧 Instalar Java y Jadx
         run: |
@@ -28,22 +33,24 @@ jobs:
 
       - name: 📝 Decompilar el APK con Jadx
         run: |
-          mkdir decompiled_app
-          ./jadx/bin/jadx -d decompiled_app app.apk
+          mkdir -p decompiled_app
+          chmod +x jadx/bin/jadx
+          jadx/bin/jadx -d decompiled_app app.apk
 
-      - name: 📂 Verificar archivos descompilados
-        run: ls -la decompiled_app
+      - name: 🛠️ Verificar archivos .java
+        run: |
+          if find decompiled_app -name "*.java" | grep .; then echo "Archivos .java encontrados"; else echo "Error: No se encontraron archivos .java"; exit 1; fi
 
       - name: 🚀 Configurar SonarCloud
         run: |
           echo "sonar.projectKey=DonChele503_Dr.ISSS-en-linea" > sonar-project.properties
           echo "sonar.organization=donchele503" >> sonar-project.properties
           echo "sonar.sources=decompiled_app" >> sonar-project.properties
+          echo "sonar.inclusions=**/*.java" >> sonar-project.properties
           echo "sonar.host.url=https://sonarcloud.io" >> sonar-project.properties
 
       - name: 🔍 Ejecutar Análisis con SonarCloud
         uses: SonarSource/sonarqube-scan-action@v4.1.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
 
