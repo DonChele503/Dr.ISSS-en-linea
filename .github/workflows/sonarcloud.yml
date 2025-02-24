@@ -37,7 +37,10 @@ jobs:
           cd decompiled_app
           mkdir -p app/src/main/java
           mv * app/src/main/java/ || true
-          echo "plugins { id 'java' }" > build.gradle
+          echo "plugins {" > build.gradle
+          echo "    id 'java'" >> build.gradle
+          echo "    id 'org.sonarqube' version '4.4.1.3373'" >> build.gradle
+          echo "}" >> build.gradle
           echo "repositories { mavenCentral() }" >> build.gradle
           echo "dependencies { }" >> build.gradle
           cd ..
@@ -68,5 +71,4 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           cd decompiled_app
-          gradle build sonar --info
-
+          gradle build sonarqube --info
