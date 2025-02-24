@@ -1,28 +1,29 @@
-name: SonarCloud Analysis
-
+name: SonarQube
 on:
   push:
     branches:
       - main
   pull_request:
-    branches:
-      - main
+    types: [opened, synchronize, reopened]
 
 jobs:
-  analyze-apk:
+  build:
+    name: Build and analyze
     runs-on: ubuntu-latest
     steps:
       - name: 🛠️ Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 📥 Descargar APK desde Google Drive
         run: |
           wget --no-check-certificate "https://drive.google.com/uc?export=download&id=1-4rE6JDNl376ph-FX9umJygEBECaaB5y" -O app.apk
 
-      - name: 🔧 Instalar Java y Jadx
+      - name: 🔧 Instalar Java, Gradle y Jadx
         run: |
           sudo apt update
-          sudo apt install -y openjdk-17-jdk unzip
+          sudo apt install -y openjdk-17-jdk unzip gradle
           wget -O jadx.zip https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip
           unzip jadx.zip -d jadx
 
@@ -31,19 +32,41 @@ jobs:
           mkdir decompiled_app
           ./jadx/bin/jadx -d decompiled_app app.apk
 
-      - name: 📂 Verificar archivos descompilados
-        run: ls -la decompiled_app
+      - name: 🔧 Configurar Proyecto Gradle en Código Descompilado
+        run: |
+          cd decompiled_app
+          mkdir -p app/src/main/java
+          mv * app/src/main/java/ || true
+          echo "plugins { id 'java' }" > build.gradle
+          echo "repositories { mavenCentral() }" >> build.gradle
+          echo "dependencies { }" >> build.gradle
+          cd ..
 
-      - name: 🚀 Configurar SonarCloud
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: ${{ runner.os }}-gradle
+
+      - name: 🚀 Configurar SonarQube
         run: |
           echo "sonar.projectKey=DonChele503_Dr.ISSS-en-linea" > sonar-project.properties
           echo "sonar.organization=donchele503" >> sonar-project.properties
-          echo "sonar.sources=decompiled_app" >> sonar-project.properties
+          echo "sonar.sources=decompiled_app/app/src/main/java" >> sonar-project.properties
           echo "sonar.host.url=https://sonarcloud.io" >> sonar-project.properties
-          echo "sonar.exclusions=**/*.java" >> sonar-project.properties
 
-      - name: 🔍 Ejecutar Análisis con SonarCloud
-        uses: SonarSource/sonarqube-scan-action@v4.1.0
+      - name: 🔍 Build y Análisis con SonarQube
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          cd decompiled_app
+          gradle build sonar --info
 
