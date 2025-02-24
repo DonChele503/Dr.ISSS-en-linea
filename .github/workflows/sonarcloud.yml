@@ -1,4 +1,4 @@
-name: SonarCloud Analysis
+name: SonarCloud Analysis with Jadx
 
 on:
   push:
@@ -14,24 +14,34 @@ jobs:
     steps:
       - name: 🛠️ Checkout Repository
         uses: actions/checkout@v3
-
-      - name: 📥 Descargar APK
+        
+      - name: 📥 Descargar APK desde Google Drive
         run: |
-          wget -O app.apk "URL_DEL_APK"  # O usa el APK de tu repo
-
-      - name: 🔍 Descompilar APK
+          FILEID="1-4rE6JDNl376ph-FX9umJygEBECaaB5y"
+          FILENAME="app.apk"
+          CONFIRM=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://drive.google.com/uc?export=download&id=${FILEID}" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')
+          wget --load-cookies /tmp/cookies.txt "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=${FILEID}" -O ${FILENAME}
+          
+      - name: 🔧 Instalar Java y Jadx
         run: |
-          sudo apt update && sudo apt install -y jadx
-          jadx -d apk_source app.apk
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk unzip
+          wget -O jadx.zip https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip
+          unzip jadx.zip -d jadx
 
+      - name: 📝 Decompilar el APK con Jadx
+        run: |
+          ./jadx/bin/jadx -d decompiled_app app.apk
+          
       - name: 🚀 Configurar SonarCloud
         run: |
-          echo "sonar.projectKey=TU_PROYECTO" > sonar-project.properties
-          echo "sonar.organization=TU_ORGANIZACION" >> sonar-project.properties
-          echo "sonar.sources=apk_source" >> sonar-project.properties
+          echo "sonar.projectKey=Dr.ISSS-en-linea" > sonar-project.properties
+          echo "sonar.organization=donchele503" >> sonar-project.properties
+          echo "sonar.sources=decompiled_app" >> sonar-project.properties
           echo "sonar.host.url=https://sonarcloud.io" >> sonar-project.properties
 
       - name: 🛠️ Ejecutar SonarScanner
         uses: sonarsource/sonarcloud-github-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
